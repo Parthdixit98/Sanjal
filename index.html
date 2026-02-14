@@ -41,15 +41,11 @@ body{
 
 <script>
 
-/////////////////////////
-// THREE SETUP
-/////////////////////////
-
 const COUNT = 60000;
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight,0.1,2000);
-camera.position.z = 500;   // increased so portrait fits
+camera.position.z = 600;
 
 const renderer = new THREE.WebGLRenderer({antialias:true});
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -62,26 +58,11 @@ window.addEventListener("resize",()=>{
     renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-/////////////////////////
-// PARTICLES
-/////////////////////////
-
 const geometry = new THREE.BufferGeometry();
 const positions = new Float32Array(COUNT*3);
 const colors = new Float32Array(COUNT*3);
-
 const targetPositions = new Float32Array(COUNT*3);
 const targetColors = new Float32Array(COUNT*3);
-
-for(let i=0;i<COUNT;i++){
-    positions[i*3] = (Math.random()-0.5)*800;
-    positions[i*3+1] = (Math.random()-0.5)*800;
-    positions[i*3+2] = 0;
-
-    colors[i*3]=1;
-    colors[i*3+1]=1;
-    colors[i*3+2]=1;
-}
 
 geometry.setAttribute("position",new THREE.BufferAttribute(positions,3));
 geometry.setAttribute("color",new THREE.BufferAttribute(colors,3));
@@ -94,9 +75,19 @@ const material = new THREE.PointsMaterial({
 const points = new THREE.Points(geometry,material);
 scene.add(points);
 
-/////////////////////////
-// IMAGE LOADING
-/////////////////////////
+// Initial random
+function randomSpace(){
+    for(let i=0;i<COUNT;i++){
+        targetPositions[i*3]   = (Math.random()-0.5)*1000;
+        targetPositions[i*3+1] = (Math.random()-0.5)*1000;
+        targetPositions[i*3+2] = 0;
+
+        targetColors[i*3]=1;
+        targetColors[i*3+1]=1;
+        targetColors[i*3+2]=1;
+    }
+}
+randomSpace();
 
 const imagePaths = ["1.jpg","2.jpg","3.jpg","4.jpg","5.jpg"];
 const imageData = [];
@@ -117,10 +108,6 @@ function loadImages(){
 }
 loadImages();
 
-/////////////////////////
-// IMAGE TO PARTICLES
-/////////////////////////
-
 function updateToImage(index){
 
     if(!imageData[index]) return;
@@ -130,48 +117,44 @@ function updateToImage(index){
     const w = img.width;
     const h = img.height;
 
-    let i = 0;
+    const scale = 0.5;   // stable scale for all images
+
+    let ptr = 0;
 
     for(let y=0;y<h;y+=3){
         for(let x=0;x<w;x+=3){
 
-            if(i>=COUNT) break;
+            if(ptr>=COUNT) break;
 
-            const idx = (y*w + x)*4;
+            const i = (y*w + x)*4;
 
-            const r = data[idx]/255;
-            const g = data[idx+1]/255;
-            const b = data[idx+2]/255;
+            const r = data[i]/255;
+            const g = data[i+1]/255;
+            const b = data[i+2]/255;
 
-            // scaled down so image fits screen
-            targetPositions[i*3] = (x - w/2) * 0.6;
-            targetPositions[i*3+1] = (h/2 - y) * 0.6;
-            targetPositions[i*3+2] = 0;
+            targetPositions[ptr*3]   = (x - w/2) * scale;
+            targetPositions[ptr*3+1] = (h/2 - y) * scale;
+            targetPositions[ptr*3+2] = 0;
 
-            targetColors[i*3] = r;
-            targetColors[i*3+1] = g;
-            targetColors[i*3+2] = b;
+            targetColors[ptr*3]   = r;
+            targetColors[ptr*3+1] = g;
+            targetColors[ptr*3+2] = b;
 
-            i++;
+            ptr++;
         }
     }
-}
 
-function randomSpace(){
-    for(let i=0;i<COUNT;i++){
-        targetPositions[i*3] = (Math.random()-0.5)*800;
-        targetPositions[i*3+1] = (Math.random()-0.5)*800;
+    // Clear remaining particles
+    for(let i=ptr;i<COUNT;i++){
+        targetPositions[i*3]   = (Math.random()-0.5)*1000;
+        targetPositions[i*3+1] = (Math.random()-0.5)*1000;
         targetPositions[i*3+2] = 0;
 
-        targetColors[i*3]=1;
-        targetColors[i*3+1]=1;
-        targetColors[i*3+2]=1;
+        targetColors[i*3]=0;
+        targetColors[i*3+1]=0;
+        targetColors[i*3+2]=0;
     }
 }
-
-/////////////////////////
-// ANIMATION
-/////////////////////////
 
 function animate(){
     requestAnimationFrame(animate);
@@ -181,16 +164,14 @@ function animate(){
         colors[i] += (targetColors[i]-colors[i])*0.08;
     }
 
-    geometry.attributes.position.needsUpdate = true;
-    geometry.attributes.color.needsUpdate = true;
+    geometry.attributes.position.needsUpdate=true;
+    geometry.attributes.color.needsUpdate=true;
 
     renderer.render(scene,camera);
 }
 animate();
 
-/////////////////////////
-// HAND DETECTION
-/////////////////////////
+//////////////// HAND TRACKING //////////////////
 
 const videoElement = document.createElement("video");
 const canvasElement = document.getElementById("output_canvas");
@@ -202,9 +183,7 @@ canvasElement.height = 160;
 let lastFinger = -1;
 
 const hands = new Hands({
-    locateFile: (file) => {
-        return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
-    }
+    locateFile: file => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
 });
 
 hands.setOptions({
@@ -222,16 +201,16 @@ hands.onResults(results=>{
     let fingers = 0;
 
     if(results.multiHandLandmarks){
-        for(const landmarks of results.multiHandLandmarks){
+        for(const lm of results.multiHandLandmarks){
 
-            drawConnectors(canvasCtx,landmarks,HAND_CONNECTIONS,{color:'#00FFFF',lineWidth:2});
-            drawLandmarks(canvasCtx,landmarks,{color:'#FFFFFF',lineWidth:1});
+            drawConnectors(canvasCtx,lm,HAND_CONNECTIONS,{color:'#00FFFF',lineWidth:2});
+            drawLandmarks(canvasCtx,lm,{color:'#FFFFFF',lineWidth:1});
 
-            if(landmarks[8].y < landmarks[6].y) fingers++;
-            if(landmarks[12].y < landmarks[10].y) fingers++;
-            if(landmarks[16].y < landmarks[14].y) fingers++;
-            if(landmarks[20].y < landmarks[18].y) fingers++;
-            if(landmarks[4].x < landmarks[3].x) fingers++;
+            if(lm[8].y < lm[6].y) fingers++;
+            if(lm[12].y < lm[10].y) fingers++;
+            if(lm[16].y < lm[14].y) fingers++;
+            if(lm[20].y < lm[18].y) fingers++;
+            if(lm[4].x < lm[3].x) fingers++;
         }
     }
 
@@ -248,9 +227,7 @@ hands.onResults(results=>{
 });
 
 const cameraMP = new Camera(videoElement,{
-    onFrame: async()=>{
-        await hands.send({image:videoElement});
-    },
+    onFrame: async()=>{ await hands.send({image:videoElement}); },
     width:640,
     height:480
 });
