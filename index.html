@@ -157,11 +157,27 @@ async function loadImages(){
 }
 loadImages();
 
-function updateToImage(index){
-    if(!imageTargets[index]) return;
-    targetPositions.set(imageTargets[index].positions);
-    targetColors.set(imageTargets[index].colors);
+function updateToImage(index) {
+
+  if (!imageTargets[index]) return;
+
+  const target = imageTargets[index];
+
+  for (let i = 0; i < COUNT; i++) {
+
+    positions[i * 3]     = target[i * 3];
+    positions[i * 3 + 1] = target[i * 3 + 1];
+    positions[i * 3 + 2] = 0;
+
+    colors[i * 3]     = imageColors[index][i * 3];
+    colors[i * 3 + 1] = imageColors[index][i * 3 + 1];
+    colors[i * 3 + 2] = imageColors[index][i * 3 + 2];
+  }
+
+  geometry.attributes.position.needsUpdate = true;
+  geometry.attributes.color.needsUpdate = true;
 }
+
 
 function randomSpace(){
     for(let i=0;i<COUNT;i++){
@@ -273,5 +289,6 @@ window.addEventListener("resize",()=>{
 
 </body>
 </html>
+
 
 
