@@ -78,7 +78,7 @@ geometry.setAttribute("position", new THREE.BufferAttribute(positions,3));
 geometry.setAttribute("color", new THREE.BufferAttribute(colors,3));
 
 const material = new THREE.PointsMaterial({
-    size:0.8,
+    size:0.6,
     vertexColors:true,
     blending:THREE.AdditiveBlending,
     transparent:true,
@@ -120,10 +120,11 @@ function generateImageTarget(src){
                     const b=data[i+2];
                     const brightness=(r+g+b)/3;
 
-                    if(ptr < COUNT){
+                    // Ignore near-black pixels (background)
+if((r + g + b) > 60 && ptr < COUNT){
                         pos[ptr*3]   = x - w/2;
                         pos[ptr*3+1] = -(y - h/2);
-                        pos[ptr*3+2] = 0;
+                        pos[ptr*3+2] = (Math.random()-0.5) * 2;
 
                         col[ptr*3]   = r/255;
                         col[ptr*3+1] = g/255;
@@ -277,4 +278,5 @@ window.addEventListener("resize",()=>{
 
 </body>
 </html>
+
 
