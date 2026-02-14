@@ -28,20 +28,38 @@ body{
     height:100%;
 }
 
-/* Message overlay */
-#messageBox{
+/* LEFT MESSAGE WITH ARROW */
+#messageContainer{
     position:fixed;
     top:50%;
-    left:50%;
-    transform:translate(-50%,-50%);
-    color:white;
-    font-size:50px;
-    font-weight:bold;
-    text-align:center;
-    pointer-events:none;
+    left:60px;
+    transform:translateY(-50%);
+    display:flex;
+    align-items:center;
+    gap:20px;
     opacity:0;
     transition:opacity 0.4s ease;
+    pointer-events:none;
+}
+
+#messageText{
+    color:white;
+    font-size:42px;
+    font-weight:bold;
     text-shadow:0 0 20px cyan;
+    max-width:400px;
+}
+
+/* Arrow */
+#arrow{
+    font-size:60px;
+    color:cyan;
+    animation:arrowMove 1s infinite alternate;
+}
+
+@keyframes arrowMove{
+    from{ transform:translateX(0px); }
+    to{ transform:translateX(15px); }
 }
 </style>
 
@@ -53,7 +71,10 @@ body{
 
 <body>
 
-<div id="messageBox"></div>
+<div id="messageContainer">
+    <div id="messageText"></div>
+    <div id="arrow">➜</div>
+</div>
 
 <div id="cameraBox">
     <canvas id="output_canvas"></canvas>
@@ -206,7 +227,8 @@ hands.onResults(results=>{
     canvasCtx.clearRect(0,0,canvasElement.width,canvasElement.height);
     canvasCtx.drawImage(results.image,0,0,canvasElement.width,canvasElement.height);
 
-    const messageBox = document.getElementById("messageBox");
+    const messageContainer = document.getElementById("messageContainer");
+    const messageText = document.getElementById("messageText");
 
     let portraitFingers = 0;
     let textFingers = 0;
@@ -225,16 +247,12 @@ hands.onResults(results=>{
             if(lm[20].y < lm[18].y) count++;
             if(lm[4].x < lm[3].x) count++;
 
-            if(index === 0){
-                portraitFingers = count;
-            }
-            else if(index === 1){
-                textFingers = count;
-            }
+            if(index === 0) portraitFingers = count;
+            if(index === 1) textFingers = count;
         });
     }
 
-    // FIRST HAND (unchanged)
+    // FIRST HAND (portrait control)
     if(portraitFingers !== lastFinger){
         lastFinger = portraitFingers;
 
@@ -246,28 +264,28 @@ hands.onResults(results=>{
         else if(portraitFingers===5) updateToImage(4);
     }
 
-    // SECOND HAND (new feature)
+    // SECOND HAND (text control)
     if(textFingers !== lastTextFinger){
         lastTextFinger = textFingers;
 
         if(textFingers === 1){
-            messageBox.innerText = "This is the best freaking person";
-            messageBox.style.opacity = 1;
+            messageText.innerText = "This is the best freaking person";
+            messageContainer.style.opacity = 1;
         }
         else if(textFingers === 2){
-            messageBox.innerText = "Absolutely iconic human being";
-            messageBox.style.opacity = 1;
+            messageText.innerText = "Absolutely iconic human being";
+            messageContainer.style.opacity = 1;
         }
         else if(textFingers === 3){
-            messageBox.innerText = "Pure energy. Pure vibe.";
-            messageBox.style.opacity = 1;
+            messageText.innerText = "Pure energy. Pure vibe.";
+            messageContainer.style.opacity = 1;
         }
         else if(textFingers === 4){
-            messageBox.innerText = "Certified legend status";
-            messageBox.style.opacity = 1;
+            messageText.innerText = "Certified legend status";
+            messageContainer.style.opacity = 1;
         }
         else{
-            messageBox.style.opacity = 0;
+            messageContainer.style.opacity = 0;
         }
     }
 
