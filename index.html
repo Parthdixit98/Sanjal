@@ -97,7 +97,7 @@ function generateImageTarget(src){
         const img = new Image();
         img.src = src;
         img.onload = ()=>{
-            const scale = 0.25;
+            const scale = 0.20;
             const w = img.width * scale;
             const h = img.height * scale;
 
@@ -132,6 +132,17 @@ function generateImageTarget(src){
                         ptr++;
                     }
                 }
+            }
+
+            // Clear unused particles (prevents green tint)
+            for(let i=ptr;i<COUNT;i++){
+                pos[i*3]   = (Math.random()-0.5)*300;
+                pos[i*3+1] = (Math.random()-0.5)*300;
+                pos[i*3+2] = 0;
+
+                col[i*3]   = 0;
+                col[i*3+1] = 0;
+                col[i*3+2] = 0;
             }
 
             resolve({positions:pos, colors:col});
@@ -184,7 +195,7 @@ function animate(){
 }
 animate();
 
-/* ===== HAND TRACKING ===== */
+/* HAND TRACKING */
 
 const videoElement = document.querySelector('.input_video');
 const canvasElement = document.getElementById("output_canvas");
@@ -224,7 +235,7 @@ hands.onResults(results=>{
 
             const fingers=countFingers(lm);
 
-            if(fingers === 0){
+            if(fingers===0){
                 randomSpace();
             }
             else if(fingers>=1 && fingers<=5){
