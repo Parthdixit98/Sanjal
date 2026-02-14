@@ -120,7 +120,7 @@ function generateImageTarget(src){
                     const b=data[i+2];
                     const brightness=(r+g+b)/3;
 
-                    if(brightness>40 && ptr<COUNT){
+                    if(ptr < COUNT){
                         pos[ptr*3]   = x - w/2;
                         pos[ptr*3+1] = -(y - h/2);
                         pos[ptr*3+2] = 0;
@@ -159,8 +159,20 @@ loadImages();
 
 function updateToImage(index){
     if(!imageTargets[index]) return;
+
     targetPositions.set(imageTargets[index].positions);
     targetColors.set(imageTargets[index].colors);
+
+    // Clear any extra particles beyond image data
+    for(let i=0;i<COUNT;i++){
+        if(targetColors[i*3]===0 &&
+           targetColors[i*3+1]===0 &&
+           targetColors[i*3+2]===0){
+            targetPositions[i*3]   = (Math.random()-0.5)*300;
+            targetPositions[i*3+1] = (Math.random()-0.5)*300;
+            targetPositions[i*3+2] = 0;
+        }
+    }
 }
 
 function randomSpace(){
@@ -265,3 +277,4 @@ window.addEventListener("resize",()=>{
 
 </body>
 </html>
+
