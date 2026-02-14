@@ -41,11 +41,16 @@ body{
 
 <script>
 
-const COUNT = 80000;
+const COUNT = 90000;
 
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight,0.1,2000);
-camera.position.z = 800;
+const camera = new THREE.PerspectiveCamera(
+    75,
+    window.innerWidth/window.innerHeight,
+    0.1,
+    5000
+);
+camera.position.z = 1000;
 
 const renderer = new THREE.WebGLRenderer({antialias:true});
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -68,7 +73,7 @@ geometry.setAttribute("position",new THREE.BufferAttribute(positions,3));
 geometry.setAttribute("color",new THREE.BufferAttribute(colors,3));
 
 const material = new THREE.PointsMaterial({
-    size:1,
+    size:1.2,
     vertexColors:true
 });
 
@@ -77,8 +82,8 @@ scene.add(points);
 
 function randomSpace(){
     for(let i=0;i<COUNT;i++){
-        targetPositions[i*3]   = (Math.random()-0.5)*1500;
-        targetPositions[i*3+1] = (Math.random()-0.5)*1500;
+        targetPositions[i*3]   = (Math.random()-0.5)*3000;
+        targetPositions[i*3+1] = (Math.random()-0.5)*3000;
         targetPositions[i*3+2] = 0;
 
         targetColors[i*3]=1;
@@ -113,7 +118,14 @@ function updateToImage(index){
     const w = img.width;
     const h = img.height;
 
-    const scale = 600 / Math.max(w,h);
+    // Calculate scale to fill screen
+    const visibleHeight = 2 * Math.tan((camera.fov * Math.PI / 180)/2) * camera.position.z;
+    const visibleWidth = visibleHeight * camera.aspect;
+
+    const scaleX = visibleWidth / w;
+    const scaleY = visibleHeight / h;
+
+    const scale = Math.max(scaleX, scaleY); // FULLSCREEN
 
     for(let i=0;i<COUNT;i++){
 
@@ -151,7 +163,7 @@ function animate(){
 }
 animate();
 
-//////////////////// HAND TRACKING ////////////////////
+//////////////// HAND TRACKING ////////////////////
 
 const videoElement = document.createElement("video");
 const canvasElement = document.getElementById("output_canvas");
