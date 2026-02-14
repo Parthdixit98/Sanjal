@@ -11,18 +11,18 @@ body{
     background:black;
 }
 
-/* Small Camera Box */
+/* CAMERA BOX */
 #videoContainer{
     position:fixed;
     bottom:20px;
     right:20px;
-    width:220px;
-    height:160px;
+    width:240px;
+    height:180px;
     border-radius:12px;
     overflow:hidden;
-    border:2px solid rgba(255,255,255,0.3);
-    box-shadow:0 0 20px rgba(0,255,255,0.4);
-    z-index:10;
+    border:2px solid rgba(0,255,255,0.6);
+    box-shadow:0 0 20px rgba(0,255,255,0.6);
+    z-index:1000;
 }
 
 #output_canvas{
@@ -51,7 +51,7 @@ video{
 <body>
 
 <div id="videoContainer">
-    <canvas id="output_canvas"></canvas>
+  <canvas id="output_canvas"></canvas>
 </div>
 
 <video class="input_video"></video>
@@ -71,7 +71,7 @@ const imagePaths = [
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-camera.position.z = 120;
+camera.position.z = 130;
 
 const renderer = new THREE.WebGLRenderer({antialias:true});
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -96,7 +96,6 @@ const material = new THREE.PointsMaterial({
 });
 
 const particles = new THREE.Points(geometry,material);
-particles.position.y = -15;
 scene.add(particles);
 
 const hiddenCanvas = document.createElement("canvas");
@@ -108,7 +107,7 @@ async function generateImageTarget(src){
         const img = new Image();
         img.src = src;
         img.onload = ()=>{
-            const scale = 0.25;
+            const scale = 0.23;
             const w = img.width * scale;
             const h = img.height * scale;
 
@@ -133,17 +132,30 @@ async function generateImageTarget(src){
 
                     if(brightness>40 && ptr<COUNT){
                         pos[ptr*3]   = x - w/2;
-                        pos[ptr*3+1] = -(y - h/2) - 20;
-                        pos[ptr*3+2] = (brightness/255)*18 - 9;
-
+                        pos[ptr*3+1] = -(y - h/2);
+                        pos[ptr*3+2] = (brightness/255)*15 - 7.5;
                         col[ptr*3]   = r/255;
                         col[ptr*3+1] = g/255;
                         col[ptr*3+2] = b/255;
-
                         ptr++;
                     }
                 }
             }
+
+            /* CENTERING FIX */
+            let minY=Infinity, maxY=-Infinity;
+            for(let i=0;i<ptr;i++){
+                const yVal = pos[i*3+1];
+                if(yVal<minY) minY=yVal;
+                if(yVal>maxY) maxY=yVal;
+            }
+
+            const centerOffset = (minY+maxY)/2;
+
+            for(let i=0;i<ptr;i++){
+                pos[i*3+1] -= centerOffset;
+            }
+
             resolve({positions:pos, colors:col});
         };
     });
@@ -183,7 +195,7 @@ function animate(){
 }
 animate();
 
-/* ================= HAND TRACKING ================= */
+/* ===== HAND TRACKING ===== */
 
 const videoElement = document.querySelector('.input_video');
 const canvasElement = document.getElementById("output_canvas");
@@ -210,17 +222,16 @@ function countFingers(lm){
 }
 
 hands.onResults((results)=>{
-    canvasElement.width = videoElement.videoWidth;
-    canvasElement.height = videoElement.videoHeight;
+    canvasElement.width = 240;
+    canvasElement.height = 180;
 
-    canvasCtx.save();
-    canvasCtx.clearRect(0,0,canvasElement.width,canvasElement.height);
-    canvasCtx.drawImage(results.image,0,0,canvasElement.width,canvasElement.height);
+    canvasCtx.clearRect(0,0,240,180);
+    canvasCtx.drawImage(results.image,0,0,240,180);
 
     if(results.multiHandLandmarks){
         for(const lm of results.multiHandLandmarks){
-            drawConnectors(canvasCtx,lm,HAND_CONNECTIONS,{color:'#00ffff',lineWidth:4});
-            drawLandmarks(canvasCtx,lm,{color:'#ffffff',lineWidth:1,radius:3});
+            drawConnectors(canvasCtx,lm,HAND_CONNECTIONS,{color:'#00ffff',lineWidth:3});
+            drawLandmarks(canvasCtx,lm,{color:'#ffffff',radius:3});
 
             const fingers = countFingers(lm);
             if(fingers>=1 && fingers<=5){
@@ -228,8 +239,6 @@ hands.onResults((results)=>{
             }
         }
     }
-
-    canvasCtx.restore();
 });
 
 const cameraUtils = new Camera(videoElement,{
