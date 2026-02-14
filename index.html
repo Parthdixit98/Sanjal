@@ -5,30 +5,54 @@
 <title>Finger Controlled Particle Portrait</title>
 
 <style>
-body {
-    margin: 0;
-    overflow: hidden;
-    background: black;
+body{
+    margin:0;
+    overflow:hidden;
+    background:black;
 }
-video {
-    display: none;
+
+/* Small Camera Box */
+#videoContainer{
+    position:fixed;
+    bottom:20px;
+    right:20px;
+    width:220px;
+    height:160px;
+    border-radius:12px;
+    overflow:hidden;
+    border:2px solid rgba(255,255,255,0.3);
+    box-shadow:0 0 20px rgba(0,255,255,0.4);
+    z-index:10;
+}
+
+#output_canvas{
+    width:100%;
+    height:100%;
+}
+
+video{
+    display:none;
 }
 </style>
 
 <script type="importmap">
 {
   "imports": {
-    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
   }
 }
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
 
 </head>
 <body>
+
+<div id="videoContainer">
+    <canvas id="output_canvas"></canvas>
+</div>
 
 <video class="input_video"></video>
 
@@ -36,147 +60,134 @@ video {
 import * as THREE from "three";
 
 const COUNT = 20000;
+
 const imagePaths = [
-  "photo1.jpg",
-  "photo2.jpg",
-  "photo3.jpg",
-  "photo4.jpg",
-  "photo5.jpg"
+  "photo1.jpg.jpeg",
+  "photo2.jpg.jpeg",
+  "photo3.jpg.jpeg",
+  "photo4.jpg.jpeg",
+  "photo5.jpg.jpeg"
 ];
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-camera.position.z = 150;
+camera.position.z = 120;
 
-const renderer = new THREE.WebGLRenderer({ antialias:true });
+const renderer = new THREE.WebGLRenderer({antialias:true});
 renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
 document.body.appendChild(renderer.domElement);
 
 const geometry = new THREE.BufferGeometry();
 const positions = new Float32Array(COUNT*3);
 const colors = new Float32Array(COUNT*3);
-const sizes = new Float32Array(COUNT);
-
 const targetPositions = new Float32Array(COUNT*3);
 const targetColors = new Float32Array(COUNT*3);
-const targetSizes = new Float32Array(COUNT);
 
 geometry.setAttribute("position", new THREE.BufferAttribute(positions,3));
 geometry.setAttribute("color", new THREE.BufferAttribute(colors,3));
-geometry.setAttribute("size", new THREE.BufferAttribute(sizes,1));
 
 const material = new THREE.PointsMaterial({
-  size:1.2,
-  vertexColors:true,
-  transparent:true,
-  blending:THREE.AdditiveBlending,
-  depthWrite:false
+    size:1.2,
+    vertexColors:true,
+    blending:THREE.AdditiveBlending,
+    transparent:true,
+    depthWrite:false
 });
 
 const particles = new THREE.Points(geometry,material);
+particles.position.y = -15;
 scene.add(particles);
 
 const hiddenCanvas = document.createElement("canvas");
 const hCtx = hiddenCanvas.getContext("2d");
-
 const imageTargets = [];
 
 async function generateImageTarget(src){
-  return new Promise(resolve=>{
-    const img = new Image();
-    img.src = src;
-    img.onload = ()=>{
-      const scale = 0.35;
-      const w = img.width * scale;
-      const h = img.height * scale;
+    return new Promise(resolve=>{
+        const img = new Image();
+        img.src = src;
+        img.onload = ()=>{
+            const scale = 0.25;
+            const w = img.width * scale;
+            const h = img.height * scale;
 
-      hiddenCanvas.width = w;
-      hiddenCanvas.height = h;
-      hCtx.drawImage(img,0,0,w,h);
+            hiddenCanvas.width = w;
+            hiddenCanvas.height = h;
+            hCtx.drawImage(img,0,0,w,h);
 
-      const data = hCtx.getImageData(0,0,w,h).data;
+            const data = hCtx.getImageData(0,0,w,h).data;
 
-      const pos = new Float32Array(COUNT*3);
-      const col = new Float32Array(COUNT*3);
-      const siz = new Float32Array(COUNT);
+            const pos = new Float32Array(COUNT*3);
+            const col = new Float32Array(COUNT*3);
 
-      let ptr=0;
+            let ptr=0;
 
-      for(let y=0;y<h;y+=2){
-        for(let x=0;x<w;x+=2){
-          const i = (y*w+x)*4;
-          const r=data[i], g=data[i+1], b=data[i+2];
-          const brightness=(r+g+b)/3;
+            for(let y=0;y<h;y+=2){
+                for(let x=0;x<w;x+=2){
+                    const i = (y*w+x)*4;
+                    const r=data[i];
+                    const g=data[i+1];
+                    const b=data[i+2];
+                    const brightness=(r+g+b)/3;
 
-          if(brightness>40 && ptr<COUNT){
-            pos[ptr*3] = x - w/2;
-            pos[ptr*3+1] = -(y - h/2);
+                    if(brightness>40 && ptr<COUNT){
+                        pos[ptr*3]   = x - w/2;
+                        pos[ptr*3+1] = -(y - h/2) - 20;
+                        pos[ptr*3+2] = (brightness/255)*18 - 9;
 
-            // slight 3D depth effect
-            pos[ptr*3+2] = (brightness/255)*20 - 10;
+                        col[ptr*3]   = r/255;
+                        col[ptr*3+1] = g/255;
+                        col[ptr*3+2] = b/255;
 
-            col[ptr*3] = r/255;
-            col[ptr*3+1] = g/255;
-            col[ptr*3+2] = b/255;
-
-            siz[ptr] = 1.3;
-
-            ptr++;
-          }
-        }
-      }
-
-      resolve({positions:pos, colors:col, sizes:siz});
-    };
-  });
+                        ptr++;
+                    }
+                }
+            }
+            resolve({positions:pos, colors:col});
+        };
+    });
 }
 
 async function loadImages(){
-  for(let i=0;i<imagePaths.length;i++){
-    const target = await generateImageTarget(imagePaths[i]);
-    imageTargets.push(target);
-  }
+    for(let i=0;i<imagePaths.length;i++){
+        const target = await generateImageTarget(imagePaths[i]);
+        imageTargets.push(target);
+    }
 }
-
 await loadImages();
 
 function updateToImage(index){
-  if(!imageTargets[index]) return;
-  targetPositions.set(imageTargets[index].positions);
-  targetColors.set(imageTargets[index].colors);
-  targetSizes.set(imageTargets[index].sizes);
+    if(!imageTargets[index]) return;
+    targetPositions.set(imageTargets[index].positions);
+    targetColors.set(imageTargets[index].colors);
 }
 
 function animate(){
-  requestAnimationFrame(animate);
+    requestAnimationFrame(animate);
 
-  const pos = geometry.attributes.position.array;
-  const col = geometry.attributes.color.array;
-  const siz = geometry.attributes.size.array;
+    const pos = geometry.attributes.position.array;
+    const col = geometry.attributes.color.array;
 
-  for(let i=0;i<COUNT*3;i++){
-    pos[i] += (targetPositions[i]-pos[i])*0.08;
-    col[i] += (targetColors[i]-col[i])*0.08;
-  }
-  for(let i=0;i<COUNT;i++){
-    siz[i] += (targetSizes[i]-siz[i])*0.08;
-  }
+    for(let i=0;i<COUNT*3;i++){
+        pos[i] += (targetPositions[i]-pos[i])*0.08;
+        col[i] += (targetColors[i]-col[i])*0.08;
+    }
 
-  geometry.attributes.position.needsUpdate=true;
-  geometry.attributes.color.needsUpdate=true;
+    geometry.attributes.position.needsUpdate=true;
+    geometry.attributes.color.needsUpdate=true;
 
-  particles.rotation.y += 0.003; // subtle cinematic rotation
+    particles.rotation.y += 0.003;
 
-  renderer.render(scene,camera);
+    renderer.render(scene,camera);
 }
 animate();
 
-
-// =====================
-// HAND TRACKING
-// =====================
+/* ================= HAND TRACKING ================= */
 
 const videoElement = document.querySelector('.input_video');
+const canvasElement = document.getElementById("output_canvas");
+const canvasCtx = canvasElement.getContext("2d");
 
 const hands = new Hands({
   locateFile:(file)=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
@@ -189,41 +200,52 @@ hands.setOptions({
 });
 
 function countFingers(lm){
-  let count=0;
-  if(lm[8].y<lm[6].y) count++;
-  if(lm[12].y<lm[10].y) count++;
-  if(lm[16].y<lm[14].y) count++;
-  if(lm[20].y<lm[18].y) count++;
-  if(lm[4].x<lm[3].x) count++;
-  return count;
+    let count=0;
+    if(lm[8].y<lm[6].y) count++;
+    if(lm[12].y<lm[10].y) count++;
+    if(lm[16].y<lm[14].y) count++;
+    if(lm[20].y<lm[18].y) count++;
+    if(lm[4].x<lm[3].x) count++;
+    return count;
 }
 
 hands.onResults((results)=>{
-  if(results.multiHandLandmarks){
-    results.multiHandLandmarks.forEach(lm=>{
-      const fingers = countFingers(lm);
-      if(fingers>=1 && fingers<=5){
-        updateToImage(fingers-1);
-      }
-    });
-  }
+    canvasElement.width = videoElement.videoWidth;
+    canvasElement.height = videoElement.videoHeight;
+
+    canvasCtx.save();
+    canvasCtx.clearRect(0,0,canvasElement.width,canvasElement.height);
+    canvasCtx.drawImage(results.image,0,0,canvasElement.width,canvasElement.height);
+
+    if(results.multiHandLandmarks){
+        for(const lm of results.multiHandLandmarks){
+            drawConnectors(canvasCtx,lm,HAND_CONNECTIONS,{color:'#00ffff',lineWidth:4});
+            drawLandmarks(canvasCtx,lm,{color:'#ffffff',lineWidth:1,radius:3});
+
+            const fingers = countFingers(lm);
+            if(fingers>=1 && fingers<=5){
+                updateToImage(fingers-1);
+            }
+        }
+    }
+
+    canvasCtx.restore();
 });
 
 const cameraUtils = new Camera(videoElement,{
-  onFrame:async ()=>{
-    await hands.send({image:videoElement});
-  },
-  width:640,
-  height:480
+    onFrame:async()=>{
+        await hands.send({image:videoElement});
+    },
+    width:640,
+    height:480
 });
 cameraUtils.start();
 
 window.addEventListener("resize",()=>{
-  camera.aspect=window.innerWidth/window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth,window.innerHeight);
+    camera.aspect = window.innerWidth/window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth,window.innerHeight);
 });
-
 </script>
 </body>
 </html>
