@@ -10,6 +10,8 @@ body{
     overflow:hidden;
     background:black;
 }
+
+/* Camera box */
 #cameraBox{
     position:fixed;
     bottom:20px;
@@ -25,6 +27,22 @@ body{
     width:100%;
     height:100%;
 }
+
+/* Message overlay */
+#messageBox{
+    position:fixed;
+    top:50%;
+    left:50%;
+    transform:translate(-50%,-50%);
+    color:white;
+    font-size:50px;
+    font-weight:bold;
+    text-align:center;
+    pointer-events:none;
+    opacity:0;
+    transition:opacity 0.4s ease;
+    text-shadow:0 0 20px cyan;
+}
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
@@ -35,11 +53,15 @@ body{
 
 <body>
 
+<div id="messageBox"></div>
+
 <div id="cameraBox">
     <canvas id="output_canvas"></canvas>
 </div>
 
 <script>
+
+//////////////////// PARTICLE SYSTEM ////////////////////
 
 const COUNT = 90000;
 
@@ -82,9 +104,9 @@ scene.add(points);
 
 function randomSpace(){
     for(let i=0;i<COUNT;i++){
-        targetPositions[i*3]   = (Math.random()-0.5)*2500;
-        targetPositions[i*3+1] = (Math.random()-0.5)*2500;
-        targetPositions[i*3+2] = 0;
+        targetPositions[i*3]=(Math.random()-0.5)*2500;
+        targetPositions[i*3+1]=(Math.random()-0.5)*2500;
+        targetPositions[i*3+2]=0;
 
         targetColors[i*3]=1;
         targetColors[i*3+1]=1;
@@ -110,7 +132,6 @@ imagePaths.forEach(path=>{
 });
 
 function updateToImage(index){
-
     if(!imageData[index]) return;
 
     const img = imageData[index];
@@ -124,11 +145,9 @@ function updateToImage(index){
     const scaleX = visibleWidth / w;
     const scaleY = visibleHeight / h;
 
-    // IMPORTANT FIX HERE
     const scale = Math.min(scaleX, scaleY) * 0.85;
 
     for(let i=0;i<COUNT;i++){
-
         const px = Math.floor(Math.random()*w);
         const py = Math.floor(Math.random()*h);
 
@@ -159,7 +178,7 @@ function animate(){
 }
 animate();
 
-//////////////// HAND TRACKING ////////////////////
+//////////////////// HAND TRACKING ////////////////////
 
 const videoElement = document.createElement("video");
 const canvasElement = document.getElementById("output_canvas");
@@ -169,13 +188,14 @@ canvasElement.width = 220;
 canvasElement.height = 160;
 
 let lastFinger = -1;
+let lastTextFinger = -1;
 
 const hands = new Hands({
     locateFile: file => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
 });
 
 hands.setOptions({
-    maxNumHands:1,
+    maxNumHands:2,
     modelComplexity:1,
     minDetectionConfidence:0.7,
     minTrackingConfidence:0.7
@@ -186,32 +206,71 @@ hands.onResults(results=>{
     canvasCtx.clearRect(0,0,canvasElement.width,canvasElement.height);
     canvasCtx.drawImage(results.image,0,0,canvasElement.width,canvasElement.height);
 
-    let fingers = 0;
+    const messageBox = document.getElementById("messageBox");
+
+    let portraitFingers = 0;
+    let textFingers = 0;
 
     if(results.multiHandLandmarks){
-        for(const lm of results.multiHandLandmarks){
+
+        results.multiHandLandmarks.forEach((lm,index)=>{
 
             drawConnectors(canvasCtx,lm,HAND_CONNECTIONS,{color:'#00FFFF',lineWidth:2});
             drawLandmarks(canvasCtx,lm,{color:'#FFFFFF',lineWidth:1});
 
-            if(lm[8].y < lm[6].y) fingers++;
-            if(lm[12].y < lm[10].y) fingers++;
-            if(lm[16].y < lm[14].y) fingers++;
-            if(lm[20].y < lm[18].y) fingers++;
-            if(lm[4].x < lm[3].x) fingers++;
+            let count = 0;
+            if(lm[8].y < lm[6].y) count++;
+            if(lm[12].y < lm[10].y) count++;
+            if(lm[16].y < lm[14].y) count++;
+            if(lm[20].y < lm[18].y) count++;
+            if(lm[4].x < lm[3].x) count++;
+
+            if(index === 0){
+                portraitFingers = count;
+            }
+            else if(index === 1){
+                textFingers = count;
+            }
+        });
+    }
+
+    // FIRST HAND (unchanged)
+    if(portraitFingers !== lastFinger){
+        lastFinger = portraitFingers;
+
+        if(portraitFingers===0) randomSpace();
+        else if(portraitFingers===1) updateToImage(0);
+        else if(portraitFingers===2) updateToImage(1);
+        else if(portraitFingers===3) updateToImage(2);
+        else if(portraitFingers===4) updateToImage(3);
+        else if(portraitFingers===5) updateToImage(4);
+    }
+
+    // SECOND HAND (new feature)
+    if(textFingers !== lastTextFinger){
+        lastTextFinger = textFingers;
+
+        if(textFingers === 1){
+            messageBox.innerText = "This is the best freaking person";
+            messageBox.style.opacity = 1;
+        }
+        else if(textFingers === 2){
+            messageBox.innerText = "Absolutely iconic human being";
+            messageBox.style.opacity = 1;
+        }
+        else if(textFingers === 3){
+            messageBox.innerText = "Pure energy. Pure vibe.";
+            messageBox.style.opacity = 1;
+        }
+        else if(textFingers === 4){
+            messageBox.innerText = "Certified legend status";
+            messageBox.style.opacity = 1;
+        }
+        else{
+            messageBox.style.opacity = 0;
         }
     }
 
-    if(fingers !== lastFinger){
-        lastFinger = fingers;
-
-        if(fingers===0) randomSpace();
-        else if(fingers===1) updateToImage(0);
-        else if(fingers===2) updateToImage(1);
-        else if(fingers===3) updateToImage(2);
-        else if(fingers===4) updateToImage(3);
-        else if(fingers===5) updateToImage(4);
-    }
 });
 
 const cameraMP = new Camera(videoElement,{
