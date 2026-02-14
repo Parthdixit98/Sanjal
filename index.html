@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
 <meta charset="UTF-8">
 <title>Finger Controlled Particle Portrait</title>
@@ -11,7 +11,6 @@ body{
     background:black;
 }
 
-/* CAMERA BOX */
 #videoContainer{
     position:fixed;
     bottom:20px;
@@ -20,9 +19,9 @@ body{
     height:180px;
     border-radius:12px;
     overflow:hidden;
-    border:2px solid rgba(0,255,255,0.6);
-    box-shadow:0 0 20px rgba(0,255,255,0.6);
-    z-index:1000;
+    border:2px solid cyan;
+    box-shadow:0 0 20px cyan;
+    z-index:999;
 }
 
 #output_canvas{
@@ -35,40 +34,30 @@ video{
 }
 </style>
 
-<script type="importmap">
-{
-  "imports": {
-    "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
-  }
-}
-</script>
-
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
-
 </head>
+
 <body>
 
 <div id="videoContainer">
-  <canvas id="output_canvas"></canvas>
+    <canvas id="output_canvas"></canvas>
 </div>
 
 <video class="input_video"></video>
 
-<script type="module">
-import * as THREE from "three";
-
-const COUNT = 20000;
+<script>
+const COUNT = 60000;
 
 const imagePaths = [
- "1.jpg",
- "2.jpg",
- "3.jpg",
- "4.jpg",
- "5.jpg"
+    "1.jpg",
+    "2.jpg",
+    "3.jpg",
+    "4.jpg",
+    "5.jpg"
 ];
-
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
@@ -89,43 +78,43 @@ geometry.setAttribute("position", new THREE.BufferAttribute(positions,3));
 geometry.setAttribute("color", new THREE.BufferAttribute(colors,3));
 
 const material = new THREE.PointsMaterial({
-    size:1.2,
+    size:0.8,
     vertexColors:true,
     blending:THREE.AdditiveBlending,
     transparent:true,
     depthWrite:false
 });
 
-const particles = new THREE.Points(geometry,material);
+const particles = new THREE.Points(geometry, material);
 scene.add(particles);
 
 const hiddenCanvas = document.createElement("canvas");
-const hCtx = hiddenCanvas.getContext("2d");
+const ctx = hiddenCanvas.getContext("2d");
 const imageTargets = [];
 
-async function generateImageTarget(src){
+function generateImageTarget(src){
     return new Promise(resolve=>{
         const img = new Image();
         img.src = src;
         img.onload = ()=>{
-            const scale = 0.23;
+            const scale = 0.25;
             const w = img.width * scale;
             const h = img.height * scale;
 
             hiddenCanvas.width = w;
             hiddenCanvas.height = h;
-            hCtx.drawImage(img,0,0,w,h);
+            ctx.drawImage(img,0,0,w,h);
 
-            const data = hCtx.getImageData(0,0,w,h).data;
+            const data = ctx.getImageData(0,0,w,h).data;
 
             const pos = new Float32Array(COUNT*3);
             const col = new Float32Array(COUNT*3);
 
-            let ptr=0;
+            let ptr = 0;
 
-            for(let y=0;y<h;y+=2){
-                for(let x=0;x<w;x+=2){
-                    const i = (y*w+x)*4;
+            for(let y=0;y<h;y+=1){
+                for(let x=0;x<w;x+=1){
+                    const i=(y*w+x)*4;
                     const r=data[i];
                     const g=data[i+1];
                     const b=data[i+2];
@@ -134,27 +123,15 @@ async function generateImageTarget(src){
                     if(brightness>40 && ptr<COUNT){
                         pos[ptr*3]   = x - w/2;
                         pos[ptr*3+1] = -(y - h/2);
-                        pos[ptr*3+2] = (brightness/255)*15 - 7.5;
+                        pos[ptr*3+2] = 0;
+
                         col[ptr*3]   = r/255;
                         col[ptr*3+1] = g/255;
                         col[ptr*3+2] = b/255;
+
                         ptr++;
                     }
                 }
-            }
-
-            /* CENTERING FIX */
-            let minY=Infinity, maxY=-Infinity;
-            for(let i=0;i<ptr;i++){
-                const yVal = pos[i*3+1];
-                if(yVal<minY) minY=yVal;
-                if(yVal>maxY) maxY=yVal;
-            }
-
-            const centerOffset = (minY+maxY)/2;
-
-            for(let i=0;i<ptr;i++){
-                pos[i*3+1] -= centerOffset;
             }
 
             resolve({positions:pos, colors:col});
@@ -163,18 +140,31 @@ async function generateImageTarget(src){
 }
 
 async function loadImages(){
-    for(let i=0;i<imagePaths.length;i++){
-        const target = await generateImageTarget(imagePaths[i]);
-        imageTargets.push(target);
+    for(let p of imagePaths){
+        imageTargets.push(await generateImageTarget(p));
     }
 }
-await loadImages();
+loadImages();
 
 function updateToImage(index){
     if(!imageTargets[index]) return;
     targetPositions.set(imageTargets[index].positions);
     targetColors.set(imageTargets[index].colors);
 }
+
+function randomSpace(){
+    for(let i=0;i<COUNT;i++){
+        targetPositions[i*3]   = (Math.random()-0.5)*300;
+        targetPositions[i*3+1] = (Math.random()-0.5)*300;
+        targetPositions[i*3+2] = 0;
+
+        targetColors[i*3]   = 0.5;
+        targetColors[i*3+1] = 0.7;
+        targetColors[i*3+2] = 1;
+    }
+}
+
+randomSpace();
 
 function animate(){
     requestAnimationFrame(animate);
@@ -190,8 +180,6 @@ function animate(){
     geometry.attributes.position.needsUpdate=true;
     geometry.attributes.color.needsUpdate=true;
 
-    particles.rotation.y += 0.003;
-
     renderer.render(scene,camera);
 }
 animate();
@@ -203,60 +191,66 @@ const canvasElement = document.getElementById("output_canvas");
 const canvasCtx = canvasElement.getContext("2d");
 
 const hands = new Hands({
-  locateFile:(file)=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+    locateFile:(file)=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
 });
 
 hands.setOptions({
-  maxNumHands:1,
-  modelComplexity:1,
-  minDetectionConfidence:0.7
+    maxNumHands:1,
+    modelComplexity:1,
+    minDetectionConfidence:0.7
 });
 
 function countFingers(lm){
-    let count=0;
-    if(lm[8].y<lm[6].y) count++;
-    if(lm[12].y<lm[10].y) count++;
-    if(lm[16].y<lm[14].y) count++;
-    if(lm[20].y<lm[18].y) count++;
-    if(lm[4].x<lm[3].x) count++;
-    return count;
+    let c=0;
+    if(lm[8].y<lm[6].y)c++;
+    if(lm[12].y<lm[10].y)c++;
+    if(lm[16].y<lm[14].y)c++;
+    if(lm[20].y<lm[18].y)c++;
+    if(lm[4].x<lm[3].x)c++;
+    return c;
 }
 
-hands.onResults((results)=>{
-    canvasElement.width = 240;
-    canvasElement.height = 180;
+hands.onResults(results=>{
+    canvasElement.width=240;
+    canvasElement.height=180;
 
     canvasCtx.clearRect(0,0,240,180);
     canvasCtx.drawImage(results.image,0,0,240,180);
 
     if(results.multiHandLandmarks){
         for(const lm of results.multiHandLandmarks){
-            drawConnectors(canvasCtx,lm,HAND_CONNECTIONS,{color:'#00ffff',lineWidth:3});
+            drawConnectors(canvasCtx,lm,HAND_CONNECTIONS,{color:'cyan',lineWidth:3});
             drawLandmarks(canvasCtx,lm,{color:'#ffffff',radius:3});
 
-            const fingers = countFingers(lm);
-            if(fingers>=1 && fingers<=5){
+            const fingers=countFingers(lm);
+
+            if(fingers === 0){
+                randomSpace();
+            }
+            else if(fingers>=1 && fingers<=5){
                 updateToImage(fingers-1);
             }
         }
+    } else {
+        randomSpace();
     }
 });
 
-const cameraUtils = new Camera(videoElement,{
+const cam = new Camera(videoElement,{
     onFrame:async()=>{
         await hands.send({image:videoElement});
     },
     width:640,
     height:480
 });
-cameraUtils.start();
+cam.start();
 
 window.addEventListener("resize",()=>{
-    camera.aspect = window.innerWidth/window.innerHeight;
+    camera.aspect=window.innerWidth/window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth,window.innerHeight);
 });
 </script>
+
 </body>
 </html>
-
