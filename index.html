@@ -41,11 +41,11 @@ body{
 
 <script>
 
-const COUNT = 60000;
+const COUNT = 80000;
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight,0.1,2000);
-camera.position.z = 600;
+camera.position.z = 800;
 
 const renderer = new THREE.WebGLRenderer({antialias:true});
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -75,11 +75,10 @@ const material = new THREE.PointsMaterial({
 const points = new THREE.Points(geometry,material);
 scene.add(points);
 
-// Initial random
 function randomSpace(){
     for(let i=0;i<COUNT;i++){
-        targetPositions[i*3]   = (Math.random()-0.5)*1000;
-        targetPositions[i*3+1] = (Math.random()-0.5)*1000;
+        targetPositions[i*3]   = (Math.random()-0.5)*1500;
+        targetPositions[i*3+1] = (Math.random()-0.5)*1500;
         targetPositions[i*3+2] = 0;
 
         targetColors[i*3]=1;
@@ -92,21 +91,18 @@ randomSpace();
 const imagePaths = ["1.jpg","2.jpg","3.jpg","4.jpg","5.jpg"];
 const imageData = [];
 
-function loadImages(){
-    imagePaths.forEach(path=>{
-        const img = new Image();
-        img.src = path;
-        img.onload = ()=>{
-            const canvas = document.createElement("canvas");
-            const ctx = canvas.getContext("2d");
-            canvas.width = img.width;
-            canvas.height = img.height;
-            ctx.drawImage(img,0,0);
-            imageData.push(ctx.getImageData(0,0,img.width,img.height));
-        };
-    });
-}
-loadImages();
+imagePaths.forEach(path=>{
+    const img = new Image();
+    img.src = path;
+    img.onload = ()=>{
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img,0,0);
+        imageData.push(ctx.getImageData(0,0,img.width,img.height));
+    };
+});
 
 function updateToImage(index){
 
@@ -117,42 +113,26 @@ function updateToImage(index){
     const w = img.width;
     const h = img.height;
 
-    const scale = 0.5;   // stable scale for all images
+    const scale = 600 / Math.max(w,h);
 
-    let ptr = 0;
+    for(let i=0;i<COUNT;i++){
 
-    for(let y=0;y<h;y+=3){
-        for(let x=0;x<w;x+=3){
+        const px = Math.floor(Math.random()*w);
+        const py = Math.floor(Math.random()*h);
 
-            if(ptr>=COUNT) break;
+        const id = (py*w + px)*4;
 
-            const i = (y*w + x)*4;
+        const r = data[id]/255;
+        const g = data[id+1]/255;
+        const b = data[id+2]/255;
 
-            const r = data[i]/255;
-            const g = data[i+1]/255;
-            const b = data[i+2]/255;
-
-            targetPositions[ptr*3]   = (x - w/2) * scale;
-            targetPositions[ptr*3+1] = (h/2 - y) * scale;
-            targetPositions[ptr*3+2] = 0;
-
-            targetColors[ptr*3]   = r;
-            targetColors[ptr*3+1] = g;
-            targetColors[ptr*3+2] = b;
-
-            ptr++;
-        }
-    }
-
-    // Clear remaining particles
-    for(let i=ptr;i<COUNT;i++){
-        targetPositions[i*3]   = (Math.random()-0.5)*1000;
-        targetPositions[i*3+1] = (Math.random()-0.5)*1000;
+        targetPositions[i*3]   = (px - w/2) * scale;
+        targetPositions[i*3+1] = (h/2 - py) * scale;
         targetPositions[i*3+2] = 0;
 
-        targetColors[i*3]=0;
-        targetColors[i*3+1]=0;
-        targetColors[i*3+2]=0;
+        targetColors[i*3]   = r;
+        targetColors[i*3+1] = g;
+        targetColors[i*3+2] = b;
     }
 }
 
@@ -160,8 +140,8 @@ function animate(){
     requestAnimationFrame(animate);
 
     for(let i=0;i<COUNT*3;i++){
-        positions[i] += (targetPositions[i]-positions[i])*0.08;
-        colors[i] += (targetColors[i]-colors[i])*0.08;
+        positions[i] += (targetPositions[i]-positions[i])*0.07;
+        colors[i] += (targetColors[i]-colors[i])*0.07;
     }
 
     geometry.attributes.position.needsUpdate=true;
@@ -171,7 +151,7 @@ function animate(){
 }
 animate();
 
-//////////////// HAND TRACKING //////////////////
+//////////////////// HAND TRACKING ////////////////////
 
 const videoElement = document.createElement("video");
 const canvasElement = document.getElementById("output_canvas");
