@@ -2,17 +2,45 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>GPU Particle Fixed</title>
-
+<title>GPU Particle Hand Control</title>
 <style>
-body{margin:0;overflow:hidden;background:black;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{overflow:hidden;background:#000;font-family:monospace;}
+
+#ui{
+  position:fixed;top:20px;left:50%;transform:translateX(-50%);
+  display:flex;gap:12px;z-index:10;
+}
+.btn{
+  padding:8px 16px;border-radius:20px;border:1px solid rgba(255,255,255,0.2);
+  background:rgba(255,255,255,0.05);color:#fff;cursor:pointer;font-size:12px;
+  transition:all 0.3s;letter-spacing:1px;
+}
+.btn:hover,.btn.active{background:rgba(0,200,255,0.2);border-color:cyan;color:cyan;}
+
+#label{
+  position:fixed;top:70px;left:50%;transform:translateX(-50%);
+  color:rgba(255,255,255,0.4);font-size:11px;letter-spacing:3px;text-transform:uppercase;
+  pointer-events:none;transition:opacity 0.5s;
+}
+
+#fingers{
+  position:fixed;top:20px;right:260px;
+  color:cyan;font-size:13px;letter-spacing:2px;
+  opacity:0.7;
+}
 
 #cameraBox{
-position:fixed;bottom:20px;right:20px;
-width:220px;height:160px;border-radius:15px;
-overflow:hidden;box-shadow:0 0 20px cyan;
+  position:fixed;bottom:20px;right:20px;
+  width:220px;height:160px;border-radius:15px;
+  overflow:hidden;box-shadow:0 0 20px cyan;border:1px solid rgba(0,255,255,0.3);
 }
 #output_canvas{width:100%;height:100%;}
+
+#hint{
+  position:fixed;bottom:20px;left:20px;
+  color:rgba(255,255,255,0.3);font-size:11px;line-height:2;letter-spacing:1px;
+}
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
@@ -20,195 +48,357 @@ overflow:hidden;box-shadow:0 0 20px cyan;
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
 </head>
-
 <body>
 
+<div id="ui">
+  <button class="btn active" onclick="switchShape(0,this)">① SPHERE</button>
+  <button class="btn" onclick="switchShape(1,this)">② TORUS</button>
+  <button class="btn" onclick="switchShape(2,this)">③ GALAXY</button>
+  <button class="btn" onclick="switchShape(3,this)">④ DNA</button>
+  <button class="btn" onclick="switchShape(4,this)">⑤ CUBE</button>
+</div>
+
+<div id="label">SPHERE</div>
+<div id="fingers">✋ FINGERS: 0</div>
+
+<div id="hint">
+  ☝ 1 finger → Sphere<br>
+  ✌ 2 fingers → Torus<br>
+  🤟 3 fingers → Galaxy<br>
+  🖖 4 fingers → DNA<br>
+  🖐 5 fingers → Cube
+</div>
+
 <div id="cameraBox">
-<canvas id="output_canvas"></canvas>
+  <canvas id="output_canvas"></canvas>
 </div>
 
 <script>
 
-//////////////////// SCENE ////////////////////
-
+// ─── SCENE ────────────────────────────────────────────────────
 const COUNT = 150000;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x000000);
 
-const camera = new THREE.PerspectiveCamera(75,innerWidth/innerHeight,0.1,5000);
-camera.position.z = 900;
+const cam3d = new THREE.PerspectiveCamera(75, innerWidth/innerHeight, 0.1, 5000);
+cam3d.position.z = 700;
 
-const renderer = new THREE.WebGLRenderer({powerPreference:"high-performance"});
-renderer.setSize(innerWidth,innerHeight);
-renderer.debug.checkShaderErrors = true;
+const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 document.body.appendChild(renderer.domElement);
 
-//////////////////// PARTICLES ////////////////////
+window.addEventListener("resize", () => {
+  cam3d.aspect = innerWidth / innerHeight;
+  cam3d.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
 
+// ─── GEOMETRY ─────────────────────────────────────────────────
 const geo = new THREE.BufferGeometry();
 
-const pos = new Float32Array(COUNT*3);
-const target = new Float32Array(COUNT*3);
-const color = new Float32Array(COUNT*3);
+const pos    = new Float32Array(COUNT * 3);
+const target = new Float32Array(COUNT * 3);
+const col    = new Float32Array(COUNT * 3);
 
-for(let i=0;i<COUNT;i++){
-    let x=(Math.random()-0.5)*2000;
-    let y=(Math.random()-0.5)*2000;
-
-    pos[i*3]=x;
-    pos[i*3+1]=y;
-    target[i*3]=x;
-    target[i*3+1]=y;
-
-    color[i*3]=1;color[i*3+1]=1;color[i*3+2]=1;
+// Start scattered
+for (let i = 0; i < COUNT; i++) {
+  pos[i*3]   = (Math.random()-0.5)*2000;
+  pos[i*3+1] = (Math.random()-0.5)*2000;
+  pos[i*3+2] = (Math.random()-0.5)*500;
+  col[i*3]=1; col[i*3+1]=1; col[i*3+2]=1;
 }
 
-geo.setAttribute("position",new THREE.BufferAttribute(pos,3));
-geo.setAttribute("aTarget",new THREE.BufferAttribute(target,3));
-geo.setAttribute("color",new THREE.BufferAttribute(color,3));
+geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+geo.setAttribute("aTarget",  new THREE.BufferAttribute(target, 3));
+geo.setAttribute("color",    new THREE.BufferAttribute(col, 3));
 
 const mat = new THREE.ShaderMaterial({
-uniforms:{uProgress:{value:1}},
-vertexShader:`
-attribute vec3 aTarget;
-attribute vec3 color;
-uniform float uProgress;
-varying vec3 vColor;
-
-void main(){
-vec3 p = mix(position,aTarget,uProgress);
-vColor=color;
-gl_Position = projectionMatrix * modelViewMatrix * vec4(p,1.0);
-gl_PointSize = 1.2;
-}
-`,
-fragmentShader:`
-varying vec3 vColor;
-void main(){
-float d=length(gl_PointCoord-vec2(0.5));
-if(d>0.5) discard;
-gl_FragColor=vec4(vColor,1.0);
-}
-`,
-vertexColors:true
+  uniforms: { uProgress: { value: 0 } },
+  vertexShader: `
+    attribute vec3 aTarget;
+    attribute vec3 color;
+    uniform float uProgress;
+    varying vec3 vColor;
+    void main(){
+      vec3 p = mix(position, aTarget, uProgress);
+      vColor = color;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+      float dist = length(p);
+      gl_PointSize = clamp(800.0 / dist, 0.8, 3.0);
+    }
+  `,
+  fragmentShader: `
+    varying vec3 vColor;
+    void main(){
+      float d = length(gl_PointCoord - vec2(0.5));
+      if(d > 0.5) discard;
+      float alpha = 1.0 - smoothstep(0.3, 0.5, d);
+      gl_FragColor = vec4(vColor, alpha);
+    }
+  `,
+  transparent: true,
+  vertexColors: true,
+  depthWrite: false
 });
 
-const points = new THREE.Points(geo,mat);
+const points = new THREE.Points(geo, mat);
 scene.add(points);
 
-//////////////////// IMAGE LOAD ////////////////////
+// ─── SHAPE GENERATORS ─────────────────────────────────────────
 
-const paths=["1.jpg","2.jpg","3.jpg","4.jpg","5.jpg"];
-const imgs=[];
+const SHAPES = [
+  { name: "SPHERE",  fn: makeSphere },
+  { name: "TORUS",   fn: makeTorus  },
+  { name: "GALAXY",  fn: makeGalaxy },
+  { name: "DNA",     fn: makeDNA    },
+  { name: "CUBE",    fn: makeCube   },
+];
 
-paths.forEach((p,i)=>{
-    const img=new Image();
-    img.src=p;
-
-    img.onload=()=>{
-        console.log("loaded:",p);
-
-        const c=document.createElement("canvas");
-        const ctx=c.getContext("2d");
-
-        c.width=img.width;
-        c.height=img.height;
-        ctx.drawImage(img,0,0);
-
-        imgs[i]=ctx.getImageData(0,0,img.width,img.height);
-
-        // auto show first image
-        if(i===0) updateImage(0);
+function hsl(h, s, l) {
+  // Returns [r,g,b] 0-1
+  h /= 360; s /= 100; l /= 100;
+  let r, g, b;
+  if (s === 0) { r = g = b = l; }
+  else {
+    const q = l < 0.5 ? l*(1+s) : l+s-l*s;
+    const p = 2*l-q;
+    const hue2rgb = (p,q,t) => {
+      if(t<0) t+=1; if(t>1) t-=1;
+      if(t<1/6) return p+(q-p)*6*t;
+      if(t<1/2) return q;
+      if(t<2/3) return p+(q-p)*(2/3-t)*6;
+      return p;
     };
-
-    img.onerror=()=>console.error("FAILED:",p);
-});
-
-function updateImage(i){
-if(!imgs[i]) return;
-
-const img=imgs[i];
-const data=img.data;
-const w=img.width,h=img.height;
-
-const t=geo.attributes.aTarget.array;
-const c=geo.attributes.color.array;
-
-for(let i=0;i<COUNT;i++){
-let px=Math.floor(Math.random()*w);
-let py=Math.floor(Math.random()*h);
-let id=(py*w+px)*4;
-
-t[i*3]=(px-w/2)*1.5;
-t[i*3+1]=(h/2-py)*1.5;
-
-c[i*3]=data[id]/255;
-c[i*3+1]=data[id+1]/255;
-c[i*3+2]=data[id+2]/255;
+    r = hue2rgb(p,q,h+1/3);
+    g = hue2rgb(p,q,h);
+    b = hue2rgb(p,q,h-1/3);
+  }
+  return [r, g, b];
 }
 
-geo.attributes.aTarget.needsUpdate=true;
-geo.attributes.color.needsUpdate=true;
-mat.uniforms.uProgress.value=0;
+function makeSphere() {
+  const t = target; const c = col;
+  const R = 300;
+  for (let i = 0; i < COUNT; i++) {
+    const phi   = Math.acos(2*Math.random()-1);
+    const theta = Math.random() * Math.PI * 2;
+    const r     = R * (0.85 + Math.random()*0.15);
+    t[i*3]   = r * Math.sin(phi) * Math.cos(theta);
+    t[i*3+1] = r * Math.sin(phi) * Math.sin(theta);
+    t[i*3+2] = r * Math.cos(phi);
+    const hue = (phi / Math.PI) * 240;
+    const [r2,g2,b2] = hsl(hue, 80, 65);
+    c[i*3]=r2; c[i*3+1]=g2; c[i*3+2]=b2;
+  }
 }
 
-//////////////////// ANIMATE ////////////////////
+function makeTorus() {
+  const t = target; const c = col;
+  const R = 250, r = 100;
+  for (let i = 0; i < COUNT; i++) {
+    const u = Math.random() * Math.PI * 2;
+    const v = Math.random() * Math.PI * 2;
+    const spread = (Math.random()-0.5) * 20;
+    const rr = r + spread;
+    t[i*3]   = (R + rr*Math.cos(v)) * Math.cos(u);
+    t[i*3+1] = (R + rr*Math.cos(v)) * Math.sin(u);
+    t[i*3+2] = rr * Math.sin(v);
+    const hue = (u / (Math.PI*2)) * 360;
+    const [r2,g2,b2] = hsl(hue, 90, 60);
+    c[i*3]=r2; c[i*3+1]=g2; c[i*3+2]=b2;
+  }
+}
 
-function animate(){
-requestAnimationFrame(animate);
+function makeGalaxy() {
+  const t = target; const c = col;
+  const ARMS = 3;
+  for (let i = 0; i < COUNT; i++) {
+    const arm    = Math.floor(Math.random() * ARMS);
+    const dist   = Math.pow(Math.random(), 1.2) * 500;
+    const angle  = (arm / ARMS) * Math.PI * 2 + (dist / 500) * Math.PI * 4;
+    const spread = (Math.random()-0.5) * (dist * 0.3 + 10);
+    const spreadY= (Math.random()-0.5) * 40;
+    t[i*3]   = Math.cos(angle) * dist + spread;
+    t[i*3+1] = spreadY;
+    t[i*3+2] = Math.sin(angle) * dist + spread;
+    const hue = 200 + arm * 40 + (dist/500)*60;
+    const bri = 50 + (1 - dist/500)*30;
+    const [r2,g2,b2] = hsl(hue % 360, 85, bri);
+    c[i*3]=r2; c[i*3+1]=g2; c[i*3+2]=b2;
+  }
+}
 
-mat.uniforms.uProgress.value+=0.02;
-if(mat.uniforms.uProgress.value>1) mat.uniforms.uProgress.value=1;
+function makeDNA() {
+  const t = target; const c = col;
+  const HEIGHT = 600;
+  const RADIUS = 120;
+  for (let i = 0; i < COUNT; i++) {
+    const y      = (i / COUNT) * HEIGHT - HEIGHT/2;
+    const strand  = i % 2;
+    const angle  = (y / HEIGHT) * Math.PI * 8 + strand * Math.PI;
+    const spread = (Math.random()-0.5) * 20;
+    const r      = RADIUS + spread;
+    const crossbar = (i % 600 < 30) ? 1 : 0;
+    let x, z;
+    if (crossbar) {
+      const frac = (i % 30) / 30;
+      const a1 = angle; const a2 = angle + Math.PI;
+      x = Math.cos(a1)*r + (Math.cos(a2)*r - Math.cos(a1)*r)*frac;
+      z = Math.sin(a1)*r + (Math.sin(a2)*r - Math.sin(a1)*r)*frac;
+    } else {
+      x = Math.cos(angle) * r;
+      z = Math.sin(angle) * r;
+    }
+    t[i*3]   = x;
+    t[i*3+1] = y;
+    t[i*3+2] = z;
+    const hue = strand === 0 ? 180 : 300;
+    const bri = 50 + Math.sin(angle)*15;
+    const [r2,g2,b2] = hsl(hue, 90, bri);
+    c[i*3]=r2; c[i*3+1]=g2; c[i*3+2]=b2;
+  }
+}
 
-renderer.render(scene,camera);
+function makeCube() {
+  const t = target; const c = col;
+  const S = 280;
+  const perFace = Math.floor(COUNT / 6);
+  let idx = 0;
+  const faces = [
+    (u,v) => [ S, (u-.5)*2*S, (v-.5)*2*S ],
+    (u,v) => [-S, (u-.5)*2*S, (v-.5)*2*S ],
+    (u,v) => [(u-.5)*2*S,  S, (v-.5)*2*S ],
+    (u,v) => [(u-.5)*2*S, -S, (v-.5)*2*S ],
+    (u,v) => [(u-.5)*2*S, (v-.5)*2*S,  S ],
+    (u,v) => [(u-.5)*2*S, (v-.5)*2*S, -S ],
+  ];
+  const faceHues = [0,60,120,180,240,300];
+  for (let f = 0; f < 6; f++) {
+    const count = f < 5 ? perFace : COUNT - idx;
+    for (let j = 0; j < count && idx < COUNT; j++, idx++) {
+      const u = Math.random(), v = Math.random();
+      const [x,y,z] = faces[f](u,v);
+      t[idx*3]   = x;
+      t[idx*3+1] = y;
+      t[idx*3+2] = z;
+      const [r2,g2,b2] = hsl(faceHues[f], 85, 65);
+      col[idx*3]=r2; col[idx*3+1]=g2; col[idx*3+2]=b2;
+    }
+  }
+}
+
+// ─── SWITCH ────────────────────────────────────────────────────
+let currentBtn = document.querySelector(".btn.active");
+let isTransitioning = false;
+
+function switchShape(idx, btn) {
+  // Snapshot current interpolated position into pos
+  const progress = mat.uniforms.uProgress.value;
+  const p = geo.attributes.position.array;
+  const tg = geo.attributes.aTarget.array;
+  for (let i = 0; i < COUNT; i++) {
+    p[i*3]   = p[i*3]   + (tg[i*3]   - p[i*3])   * progress;
+    p[i*3+1] = p[i*3+1] + (tg[i*3+1] - p[i*3+1]) * progress;
+    p[i*3+2] = p[i*3+2] + (tg[i*3+2] - p[i*3+2]) * progress;
+  }
+  geo.attributes.position.needsUpdate = true;
+
+  SHAPES[idx].fn();
+  geo.attributes.aTarget.needsUpdate = true;
+  geo.attributes.color.needsUpdate   = true;
+
+  mat.uniforms.uProgress.value = 0;
+
+  document.getElementById("label").textContent = SHAPES[idx].name;
+
+  if (currentBtn) currentBtn.classList.remove("active");
+  if (btn) { btn.classList.add("active"); currentBtn = btn; }
+}
+
+// Init first shape
+makeSphere();
+geo.attributes.aTarget.needsUpdate = true;
+geo.attributes.color.needsUpdate   = true;
+mat.uniforms.uProgress.value = 0;
+
+// ─── ANIMATE ───────────────────────────────────────────────────
+const clock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  const t2 = clock.getElapsedTime();
+
+  mat.uniforms.uProgress.value = Math.min(mat.uniforms.uProgress.value + 0.015, 1);
+
+  points.rotation.y = t2 * 0.08;
+  points.rotation.x = Math.sin(t2 * 0.03) * 0.1;
+
+  renderer.render(scene, cam3d);
 }
 animate();
 
-//////////////////// HAND ////////////////////
+// ─── MEDIAPIPE HANDS ───────────────────────────────────────────
+const video  = document.createElement("video");
+const canvas = document.getElementById("output_canvas");
+const ctx    = canvas.getContext("2d");
+canvas.width  = 220;
+canvas.height = 160;
 
-const video=document.createElement("video");
-const canvas=document.getElementById("output_canvas");
-const ctx=canvas.getContext("2d");
+let lastFingers = -1;
 
-canvas.width=220;
-canvas.height=160;
-
-let last=-1;
-
-const hands=new Hands({
-locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
+const hands = new Hands({
+  locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
 });
 
-hands.setOptions({maxNumHands:1});
-
-hands.onResults(r=>{
-ctx.drawImage(r.image,0,0,220,160);
-
-let f=0;
-if(r.multiHandLandmarks){
-let lm=r.multiHandLandmarks[0];
-if(lm[8].y<lm[6].y)f++;
-if(lm[12].y<lm[10].y)f++;
-if(lm[16].y<lm[14].y)f++;
-if(lm[20].y<lm[18].y)f++;
-if(lm[4].x<lm[3].x)f++;
-}
-
-if(f!==last){
-last=f;
-if(f===1) updateImage(0);
-if(f===2) updateImage(1);
-if(f===3) updateImage(2);
-if(f===4) updateImage(3);
-if(f===5) updateImage(4);
-}
+hands.setOptions({
+  maxNumHands: 1,
+  modelComplexity: 0,
+  minDetectionConfidence: 0.7,
+  minTrackingConfidence: 0.5
 });
 
-new Camera(video,{
-onFrame:async()=>await hands.send({image:video}),
-width:640,height:480
-}).start();
+hands.onResults(r => {
+  ctx.clearRect(0, 0, 220, 160);
+  ctx.drawImage(r.image, 0, 0, 220, 160);
+
+  let f = 0;
+  if (r.multiHandLandmarks && r.multiHandLandmarks.length > 0) {
+    const lm = r.multiHandLandmarks[0];
+
+    // Draw landmarks
+    drawConnectors(ctx, lm, HAND_CONNECTIONS, { color: "rgba(0,255,255,0.6)", lineWidth: 1 });
+    drawLandmarks(ctx, lm, { color: "cyan", lineWidth: 1, radius: 2 });
+
+    // Count fingers
+    // Index, Middle, Ring, Pinky: tip y < pip y means extended
+    if (lm[8].y  < lm[6].y)  f++;
+    if (lm[12].y < lm[10].y) f++;
+    if (lm[16].y < lm[14].y) f++;
+    if (lm[20].y < lm[18].y) f++;
+    // Thumb: tip x vs ip x (mirrored)
+    if (Math.abs(lm[4].x - lm[9].x) > 0.1) f++;
+  }
+
+  document.getElementById("fingers").textContent = `✋ FINGERS: ${f}`;
+
+  if (f !== lastFingers && f >= 1 && f <= 5) {
+    lastFingers = f;
+    const btn = document.querySelectorAll(".btn")[f - 1];
+    switchShape(f - 1, btn);
+  }
+});
+
+try {
+  new Camera(video, {
+    onFrame: async () => await hands.send({ image: video }),
+    width: 640, height: 480
+  }).start();
+} catch(e) {
+  console.warn("Camera failed:", e);
+}
 
 </script>
 </body>
